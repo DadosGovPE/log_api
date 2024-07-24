@@ -7,24 +7,36 @@ from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 import os
 from django.http import FileResponse
+from .serializers import SetFolderSerializer
+from rest_framework.generics import GenericAPIView
+from dotenv import load_dotenv
 
-class SetFolderView(APIView):
+# Carregar variáveis do .env
+load_dotenv()
+
+LOG_FOLDER = os.getenv('LOG_FOLDER')
+
+class SetFolderView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
-
-    def post(self, request, format=None):
-        folder = request.data.get('folder', None)
-        if folder and os.path.isdir(folder):
-            settings.LOG_FOLDER = folder
-            return Response({"message": "Folder set successfully"}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "Invalid folder path"}, status=status.HTTP_400_BAD_REQUEST)
+    serializer_class = SetFolderSerializer
+    def post(self, request):
+        serializer = SetFolderSerializer(data=request.data)
+        if serializer.is_valid():
+            folder = serializer.validated_data.get('folder')
+            if folder and os.path.isdir(folder):
+                settings.LOG_FOLDER = folder
+                return Response({"message": "Folder set successfully"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid folder path"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class DownloadLogView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        folder = getattr(settings, 'LOG_FOLDER', None)
+        folder = LOG_FOLDER
+        #folder = getattr(settings, 'LOG_FOLDER', None)
         if folder:
             log_file_path = os.path.join(folder, 'access.log.1')
             print(log_file_path)
